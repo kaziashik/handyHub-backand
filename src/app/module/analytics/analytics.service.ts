@@ -51,7 +51,7 @@ const getAdminAnalytics = async () => {
 
     const totalRefundResult = await prisma.payment.aggregate({
         where: {
-            status: PaymentStatus.PAID
+            status: PaymentStatus.REFUNDED
         },
         _sum: {
             amount: true
@@ -69,7 +69,7 @@ const getAdminAnalytics = async () => {
         }
     })
 
-    const totalRevenue = (totalRevenueResult._sum.amount?.toNumber() || 0) - totalRefunded 
+    const totalRevenue = totalRevenueResult._sum.amount?.toNumber() || 0 
 
     
 

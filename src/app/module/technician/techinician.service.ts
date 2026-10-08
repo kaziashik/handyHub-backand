@@ -202,7 +202,7 @@ const verifyTechinicianEmail = async (
     throw new AppError(httpStatus.CONFLICT, "Email Already Verified");
   }
 
-  const otpKey = `techinicia-application-otp:${payload.email}`;
+  const otpKey = `techinicia-application-otp:${email}`;
 
   const redisOtp = await redisClient.get(otpKey);
 

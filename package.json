@@ -8,9 +8,10 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
-    "start": "node dist/src/server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsup",
+    "start": "node dist/server.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
@@ -26,7 +27,8 @@
     "@types/pdfkit": "^0.17.6",
     "@types/pg": "^8.23.1",
     "prisma": "^7.9.1",
-    "tsx": "^4.23.12",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.13",
     "typescript": "^7.0.2"
   },
   "dependencies": {

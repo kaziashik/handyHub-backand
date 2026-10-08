@@ -49,7 +49,7 @@ router.get(
 
 router.get(
 	"/doctor-appointments",
-	auth(Role.CUSTOMER),
+	auth(Role.TECHNICIAN),
 	AppointmentController.getDoctorAppointments,
 );
 

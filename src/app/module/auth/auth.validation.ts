@@ -16,7 +16,7 @@ const RegisterUserZodSchema = z.object({
       /[^A-Za-z0-9]/,
       "Password must contain at least one special character.",
     ),
-  role: z.enum(["CUSTOMER", "TECHNICIAN"]),
+  role: z.literal("CUSTOMER"),
   phone: z.string().optional(),
 });
 

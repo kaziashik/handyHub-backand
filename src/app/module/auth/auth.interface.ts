@@ -10,7 +10,7 @@ export interface IRegisterUserPayload {
   name: string;
   email: string;
   password: string;
-  role: Extract<Role, "CUSTOMER" | "TECHNICIAN">;
+  role: Extract<Role, "CUSTOMER">;
   phone?: string;
 }
 

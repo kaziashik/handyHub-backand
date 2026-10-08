@@ -118,6 +118,12 @@ const verifyUserEmail = async (payload: IVerifyEmailPayload) => {
 
   const userPayload: IRegisterUserPayload = JSON.parse(redisUserData);
 
+  if (userPayload.role !== "CUSTOMER") {
+    throw new Error(
+      "Technician accounts must be created through the technician application",
+    );
+  }
+
   const createdUser = await prisma.user.create({
     data: {
       name: userPayload.name,
@@ -133,20 +139,13 @@ const verifyUserEmail = async (payload: IVerifyEmailPayload) => {
           password: userPayload.password,
         },
       },
-      ...(userPayload.role === "TECHNICIAN" && {
-        technicianProfile: {
-          create: {},
+      customer: {
+        create: {
+          name: userPayload.name,
+          email: userPayload.email,
+          contactNumber: userPayload.phone,
         },
-      }),
-      ...(userPayload.role === "CUSTOMER" && {
-        customer: {
-          create: {
-            name: userPayload.name,
-            email: userPayload.email,
-            contactNumber: userPayload.phone,
-          },
-        },
-      }),
+      },
     },
     include: {
       technicianProfile: true,

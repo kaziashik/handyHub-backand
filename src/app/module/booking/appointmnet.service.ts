@@ -133,39 +133,7 @@ const bookAppointment = async (payload: any, user: RequestUser) => {
     return { appointment, amount };
   });
 
-  // 2. Call bKash OUTSIDE the DB transaction — no reason to hold a DB tx open for a network call
-  const bkashIdToken = await getBkashIdToken();
-
-  if (!bkashIdToken) {
-    throw new AppError(httpStatus.BAD_GATEWAY, "No Bkash Access Token Found!");
-  }
-
-  const bkashCreatePaymentResponse = await fetch(
-    `${config.bkash_base_url}/tokenized/checkout/create`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        Authorization: bkashIdToken,
-        "X-App-Key": config.bkash_app_key,
-      },
-      body: JSON.stringify({
-        mode: "0011",
-        payerReference: user.email,
-        callbackURL: `${config.bkash_callback_url}/api/v1/appointment/book-appointment/payment/callback`,
-        amount: amount,
-        currency: "BDT",
-        intent: "sale",
-        merchantInvoiceNumber: appointment.id,
-      }),
-    },
-  );
-
-  const bkashCreatePaymentResult = await bkashCreatePaymentResponse.json();
-
-  if (!bkashCreatePaymentResponse.ok) {
-    // payment initiation failed — release the slot and cancel the appointment
+  const releaseReservation = async () => {
     await prisma.$transaction([
       prisma.apppointment.update({
         where: { id: appointment.id },
@@ -176,28 +144,65 @@ const bookAppointment = async (payload: any, user: RequestUser) => {
         data: { availableSlots: { increment: 1 } },
       }),
     ]);
-
-    throw new AppError(
-      httpStatus.BAD_GATEWAY,
-      "Failed To Initiate Bkash Payment",
-    );
-  }
-
-  // 3. Persist the payment record
-  await prisma.payment.create({
-    data: {
-      merchantInvoiceNumber: bkashCreatePaymentResult.merchantInvoiceNumber,
-      appointmentId: appointment.id,
-      amount: amount,
-      gatewayResponse: bkashCreatePaymentResult,
-      bkashPaymentId: bkashCreatePaymentResult.paymentID,
-      payerReference: user.email,
-    },
-  });
-
-  return {
-    paymentUrl: bkashCreatePaymentResult.bkashURL,
   };
+
+  // 2. Call bKash OUTSIDE the DB transaction — no reason to hold a DB tx open for a network call
+  try {
+    const bkashIdToken = await getBkashIdToken();
+
+    if (!bkashIdToken) {
+      throw new AppError(httpStatus.BAD_GATEWAY, "No Bkash Access Token Found!");
+    }
+
+    const bkashCreatePaymentResponse = await fetch(
+      `${config.bkash_base_url}/tokenized/checkout/create`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: bkashIdToken,
+          "X-App-Key": config.bkash_app_key,
+        },
+        body: JSON.stringify({
+          mode: "0011",
+          payerReference: user.email,
+          callbackURL: `${config.bkash_callback_url}/api/v1/appointment/book-appointment/payment/callback`,
+          amount: amount,
+          currency: "BDT",
+          intent: "sale",
+          merchantInvoiceNumber: appointment.id,
+        }),
+      },
+    );
+
+    const bkashCreatePaymentResult = await bkashCreatePaymentResponse.json();
+
+    if (!bkashCreatePaymentResponse.ok || !bkashCreatePaymentResult?.bkashURL) {
+      throw new AppError(
+        httpStatus.BAD_GATEWAY,
+        "Failed To Initiate Bkash Payment",
+      );
+    }
+
+    await prisma.payment.create({
+      data: {
+        merchantInvoiceNumber: bkashCreatePaymentResult.merchantInvoiceNumber,
+        appointmentId: appointment.id,
+        amount: amount,
+        gatewayResponse: bkashCreatePaymentResult,
+        bkashPaymentId: bkashCreatePaymentResult.paymentID,
+        payerReference: user.email,
+      },
+    });
+
+    return {
+      paymentUrl: bkashCreatePaymentResult.bkashURL,
+    };
+  } catch (error) {
+    await releaseReservation();
+    throw error;
+  }
 };
 
 
@@ -263,7 +268,6 @@ const bookAppointmentCallback = async (query: Record<string, any>) => {
 				}
 
 				// Idempotency guard — bKash callbacks can be retried/duplicated.
-				// Without this, a retry would re-decrement slots and resend the invoice email.
 				if (appointment.status === AppointmentStatus.CONFIRMED) {
 					return {
 						appointment,
@@ -272,10 +276,27 @@ const bookAppointmentCallback = async (query: Record<string, any>) => {
 					};
 				}
 
-				// total slot = 3, available slot = 2 => (total - available) + 1
-				const alreadyBookedSlots =
-					appointment.schedule.totalSlots - appointment.schedule.availableSlots;
-				const serialNumber = alreadyBookedSlots + 1;
+				if (appointment.status !== AppointmentStatus.PENDING) {
+					throw new AppError(
+						httpStatus.CONFLICT,
+						"Appointment Can No Longer Be Confirmed",
+					);
+				}
+
+				// The slot was already reserved when the appointment was booked.
+				const confirmedCount = await tx.apppointment.count({
+					where: {
+						scheduleId: appointment.schedule.id,
+						status: {
+							in: [
+								AppointmentStatus.CONFIRMED,
+								AppointmentStatus.ONGOING,
+								AppointmentStatus.COMPLETED,
+							],
+						},
+					},
+				});
+				const serialNumber = confirmedCount + 1;
 
 				const joiningTime = addMinutes(
 					appointment.schedule.startDateTime,
@@ -290,25 +311,6 @@ const bookAppointmentCallback = async (query: Record<string, any>) => {
 						serialNumber,
 					},
 				});
-
-				// Atomic decrement guarded with gt:0 — avoids the race condition of
-				// read-then-subtract, and can never go negative.
-				const scheduleUpdateResult = await tx.schedule.updateMany({
-					where: {
-						id: appointment.schedule.id,
-						availableSlots: { gt: 0 },
-					},
-					data: {
-						availableSlots: { decrement: 1 },
-					},
-				});
-
-				if (scheduleUpdateResult.count === 0) {
-					throw new AppError(
-						httpStatus.CONFLICT,
-						"No Available Slots Left To Confirm This Appointment",
-					);
-				}
 
 				// Look up the payment by appointmentId, then verify bkashPaymentId matches,
 				// instead of relying on a compound where clause that may not be a real
@@ -508,6 +510,10 @@ const payAppointment = async (payload: IPayAppointmentPayload, user: RequestUser
 
 	const bkashCreatePaymentResult = await bkashCreatePaymentResponse.json();
 
+	if (!bkashCreatePaymentResponse.ok || !bkashCreatePaymentResult?.bkashURL) {
+		throw new AppError(httpStatus.BAD_GATEWAY, "Failed To Initiate Bkash Payment");
+	}
+
 	await prisma.payment.update({
 		where: {
 			appointmentId: existingAppointment.id,
@@ -530,12 +536,16 @@ const cancelAppointment = async (payload: ICancelAppointmentPayload, user : Requ
 	const transactionResult = await prisma.$transaction(async (tx) => {
 		const appointmentId = payload.appointmentId;
 
-		const existingAppointment = await tx.apppointment.findUnique({
+		const existingAppointment = await tx.apppointment.findFirst({
 		where: {
 			id: appointmentId,
-			customer : {
-				email : user.email
-			}
+			...(user.role === Role.ADMIN
+				? {}
+				: {
+						customer: {
+							email: user.email,
+						},
+					}),
 		},
 			include: {
 				payment: true,
@@ -567,7 +577,7 @@ const cancelAppointment = async (payload: ICancelAppointmentPayload, user : Requ
 			},
 		});
 
-		await prisma.schedule.update({
+		await tx.schedule.update({
 			where : {
 				id : existingAppointment.schedule.id
 			},
@@ -634,7 +644,7 @@ const cancelAppointment = async (payload: ICancelAppointmentPayload, user : Requ
 
 		}
 
-		const newPaymentInfo = await prisma.payment.findUnique({
+		const newPaymentInfo = await tx.payment.findUnique({
 			where: {
 				appointmentId: existingAppointment.id,
 			},
