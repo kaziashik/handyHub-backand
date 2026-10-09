@@ -220,6 +220,14 @@ const getAllSchedules = async (query : IQuery) => {
             [sortBy]: sortOrder
         },
         include: {
+            techinician: {
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    specialization: true,
+                },
+            },
             appointments: {
                 include: {
                     customer: true
@@ -330,6 +338,7 @@ const updateSchedule = async (scheduleId : string, payload : IUpdateSchedulePayl
 
     const existingScheduleOnThisDate = await prisma.schedule.findFirst({
         where: {
+            id: { not: schedule.id },
             techinicianId: techinician.id,
             isDeleted: false,
             startDateTime: {
@@ -448,32 +457,17 @@ const deleteSchedule = async (scheduleId: string, user: RequestUser) => {
 
 
 const getTodaysSchedules = async (query : IQuery) => {
-    if(!query.doctorId){
-        throw new AppError(httpStatus.NOT_FOUND, "Doctor Id Must Be Provided In Query")
-    }
-
-    const doctor = await prisma.techinician.findUnique({
-        where: { id : query.doctorId },
-    });
-
-    if (!doctor) {
-        throw new AppError(httpStatus.NOT_FOUND, "Doctor Profile Not Found");
-    }
-
     const limit = query.limit ? Number(query.limit) : 10;
     const page = query.page ? Number(query.page) : 1;
     const skip = (page - 1) * limit;
-    const sortBy = query.sortBy ? query.sortBy : "createdAt";
-    const sortOrder = query.sortOrder ? query.sortOrder : "desc"
+    const sortBy = query.sortBy ? query.sortBy : "startDateTime";
+    const sortOrder = query.sortOrder ? query.sortOrder : "asc"
 
     const now = new Date();
     const startOfToday = startOfDay(now);
     const startOfTomorrow = addDays(startOfToday, 1)
 
     const andConditions: ScheduleWhereInput[] = [
-        {
-            techinicianId : query.doctorId
-        },
         {
             isDeleted : false
         },
@@ -492,15 +486,37 @@ const getTodaysSchedules = async (query : IQuery) => {
         }
     ];
 
+    if (query.doctorId) {
+        const doctor = await prisma.techinician.findUnique({
+            where: { id : query.doctorId },
+        });
+
+        if (!doctor) {
+            throw new AppError(httpStatus.NOT_FOUND, "Doctor Profile Not Found");
+        }
+
+        andConditions.push({
+            techinicianId : query.doctorId
+        });
+    }
+
     const schedules = await prisma.schedule.findMany({
         where: {
             AND: andConditions
+        },
+        include: {
+            techinician: {
+                select: {
+                    id: true,
+                    name: true,
+                    consultationFee: true,
+                },
+            },
         },
 
         take: limit,
         skip,
         orderBy: {
-            // sortBy : sortOrder
             [sortBy]: sortOrder
         }
     })

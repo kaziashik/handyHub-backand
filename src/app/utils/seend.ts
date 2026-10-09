@@ -132,3 +132,89 @@ export const seedTesterTechinican = async () => {
 		});
 	}
 };
+
+export const seedTesterAdmin = async () => {
+  try {
+    const email = config.tester_admin_email?.trim().toLowerCase();
+    const name = config.tester_admin_name;
+    const password = config.tester_admin_password;
+
+    if (!name || !email || !password) {
+      throw new Error("Tester admin name, email, or password missing in env file!");
+    }
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      console.log("Tester admin already exists!");
+      return;
+    }
+
+    const hashedPassword = await bcrypt.hash(password, config.bcrypt_salt_rounds);
+    const testerAdmin = await prisma.user.create({
+      data: {
+        name,
+        email,
+        role: Role.ADMIN,
+        emailVerified: true,
+        isVerified: true,
+        auths: {
+          create: {
+            provider: AuthProvider.CREDENTIALS,
+            providerId: email,
+            password: hashedPassword,
+          },
+        },
+      },
+      include: { auths: { omit: { password: true } } },
+    });
+
+    console.log("Tester admin created:", testerAdmin.email);
+  } catch (error) {
+    console.log("Error seeding tester admin:", error);
+  }
+};
+
+export const seedDemoCustomer = async () => {
+  const email = "user@gmail.com";
+  try {
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      console.log("Demo user already exists!");
+      return;
+    }
+
+    const hashedPassword = await bcrypt.hash(
+      "User@demo12345",
+      config.bcrypt_salt_rounds,
+    );
+    const demoUser = await prisma.user.create({
+      data: {
+        name: "Demo User",
+        email,
+        role: Role.CUSTOMER,
+        emailVerified: true,
+        isVerified: true,
+        phone: "01700000000",
+        auths: {
+          create: {
+            provider: AuthProvider.CREDENTIALS,
+            providerId: email,
+            password: hashedPassword,
+          },
+        },
+        customer: {
+          create: {
+            name: "Demo User",
+            email,
+            contactNumber: "01700000000",
+          },
+        },
+      },
+      include: { auths: { omit: { password: true } } },
+    });
+
+    console.log("Demo user created:", demoUser.email);
+  } catch (error) {
+    console.log("Error seeding demo user:", error);
+  }
+};
