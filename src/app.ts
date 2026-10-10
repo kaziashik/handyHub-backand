@@ -18,9 +18,14 @@ import { generalLimiter } from "./app/middleware/rateLimiter";
 
 const app: Application = express();
 
+const allowedOrigins = (config.frontend_url ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 app.use(
   cors({
-    origin: config.frontend_url,
+    origin: allowedOrigins.length > 1 ? allowedOrigins : allowedOrigins[0],
     credentials: true,
   })
 );
