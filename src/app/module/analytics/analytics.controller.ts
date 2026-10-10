@@ -38,8 +38,19 @@ const getAdminAnalytics = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
+const getPublicOverview = catchAsync(async (_req: Request, res: Response) => {
+  const result = await AnalyticsServices.getPublicOverview();
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Overview retrieved successfully",
+    data: result,
+  });
+});
+
 export const AnalyticsController = {
     getAdminAnalytics,
     getCustomerAnalytics,
-    getTechicianAnalytics
+    getTechicianAnalytics,
+    getPublicOverview,
 };

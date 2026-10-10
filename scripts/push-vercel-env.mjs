@@ -29,7 +29,11 @@ const overrides = Object.fromEntries(
   }),
 );
 
-const env = { ...parseEnv(".env"), ...overrides, node_env: "production" };
+const env = {
+  ...parseEnv(process.env.ENV_FILE || ".env"),
+  ...overrides,
+  node_env: "production",
+};
 
 function add(name, value) {
   return new Promise((resolve) => {

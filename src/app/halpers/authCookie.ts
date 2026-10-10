@@ -7,14 +7,14 @@ export interface AuthTokens {
 }
 
 const cookieOptions = {
-  httpOnly: true,  // true/false
-  secure: config.node_env === "production", // http / https
+  httpOnly: true,
+  secure: config.node_env === "production",
   sameSite:
     config.node_env === "production" ? ("none" as const) : ("lax" as const),
-};  // none / strict / lax
+  partitioned: config.node_env === "production",
+};
 
 export const setAuthCookie = (res: Response, tokenInfo: AuthTokens) => {
-    console.log("cookieOptions:", cookieOptions);
   if (tokenInfo.accessToken) {
     res.cookie("accessToken", tokenInfo.accessToken, {
       ...cookieOptions,

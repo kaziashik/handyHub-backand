@@ -3,7 +3,6 @@ import { catchAsync } from "../../utils/catchAsync";
 import { sendResponse } from "../../utils/sendResponse";
 import { AuthService, AuthServices } from "./auth.service";
 import httpStatus from "http-status";
-import config from "../../config";
 import { IRequestUser } from "./auth.interface";
 import { clearAuthCookie, setAuthCookie } from "../../halpers/authCookie";
 import { createUserTokens } from "../../halpers/authToken";
@@ -53,18 +52,7 @@ const verifyUserEmail = catchAsync(async (req: Request, res: Response) => {
 
   const { accessToken, refreshToken, user, technicianProfile } = result;
 
-  res.cookie("accessToken", accessToken, {
-    httpOnly: true,
-    secure: config.node_env === "production",
-    sameSite: config.node_env === "production" ? "none" : "lax",
-    maxAge: 1000 * 60 * 60 * 24, // 1 day
-  });
-  res.cookie("refreshToken", refreshToken, {
-    httpOnly: true,
-    secure: config.node_env === "production",
-    sameSite: config.node_env === "production" ? "none" : "lax",
-    maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
-  });
+  setAuthCookie(res, { accessToken, refreshToken });
 
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
@@ -205,19 +193,7 @@ const googleLogin = catchAsync(async (req: Request, res: Response) => {
 
   const { accessToken, refreshToken, user } = result;
 
-  res.cookie("accessToken", accessToken, {
-    httpOnly: true,
-    secure: config.node_env === "production",
-    sameSite: config.node_env === "production" ? "none" : "lax",
-    maxAge: 1000 * 60 * 60 * 24,
-  });
-
-  res.cookie("refreshToken", refreshToken, {
-    httpOnly: true,
-    secure: config.node_env === "production",
-    sameSite: config.node_env === "production" ? "none" : "lax",
-    maxAge: 1000 * 60 * 60 * 24 * 7,
-  });
+  setAuthCookie(res, { accessToken, refreshToken });
 
   sendResponse(res, {
     statusCode: httpStatus.OK,

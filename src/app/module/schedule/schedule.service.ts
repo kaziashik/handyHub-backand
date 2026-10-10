@@ -510,6 +510,13 @@ const getTodaysSchedules = async (query : IQuery) => {
                     id: true,
                     name: true,
                     consultationFee: true,
+                    specialization: true,
+                    bio: true,
+                    user: {
+                        select: {
+                            imageUrl: true,
+                        },
+                    },
                 },
             },
         },

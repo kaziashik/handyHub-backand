@@ -87,6 +87,73 @@ const uploadProfileImage = async (buffer: Buffer, userId: string) => {
   return updatedUser;
 };
 
+const updateProfile = async (
+  userId: string,
+  payload: { name: string; phone?: string },
+) => {
+  return prisma.user.update({
+    where: { id: userId },
+    data: {
+      name: payload.name,
+      phone: payload.phone ? payload.phone : null,
+    },
+    omit: { password: true },
+  });
+};
+
+const getCustomers = async (query: {
+  searchTerm?: string;
+  page?: string;
+  limit?: string;
+}) => {
+  const limit = query.limit ? Number(query.limit) : 10;
+  const page = query.page ? Number(query.page) : 1;
+  const skip = (page - 1) * limit;
+  const where = {
+    role: "CUSTOMER" as const,
+    isDeleted: false,
+    ...(query.searchTerm
+      ? {
+          OR: [
+            { name: { contains: query.searchTerm, mode: "insensitive" as const } },
+            { email: { contains: query.searchTerm, mode: "insensitive" as const } },
+            { phone: { contains: query.searchTerm, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+  };
+
+  const [data, total] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        createdAt: true,
+        status: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      skip,
+    }),
+    prisma.user.count({ where }),
+  ]);
+
+  return {
+    data,
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+};
+
 export const UserServices = {
   uploadProfileImage,
+  updateProfile,
+  getCustomers,
 };

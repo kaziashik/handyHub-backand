@@ -5,6 +5,8 @@ import { AnalyticsController } from "./analytics.controller";
 
 const router = Router();
 
+router.get("/public-overview", AnalyticsController.getPublicOverview);
+
 router.get(
     "/customer-analytics",
     auth(Role.CUSTOMER),

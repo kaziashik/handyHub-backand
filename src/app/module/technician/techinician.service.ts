@@ -416,9 +416,132 @@ const getAllTechinician=async(query:IQuery)=>{
 
 }
 
+const publicTechnicianSelect = {
+  id: true,
+  name: true,
+  specialization: true,
+  qualifications: true,
+  experienceYears: true,
+  bio: true,
+  consultationFee: true,
+  address: true,
+  user: {
+    select: {
+      imageUrl: true,
+    },
+  },
+} as const;
+
+const publicSortFields = new Set([
+  "name",
+  "experienceYears",
+  "consultationFee",
+  "createdAt",
+]);
+
+const getPublicTechnicians = async (query: IQuery) => {
+  const limit = query.limit ? Number(query.limit) : 9;
+  const page = query.page ? Number(query.page) : 1;
+  const skip = (page - 1) * limit;
+  const sortBy = publicSortFields.has(query.sortBy ?? "")
+    ? query.sortBy!
+    : "createdAt";
+  const sortOrder = query.sortOrder === "asc" ? "asc" : "desc";
+  const andConditions: TechinicianWhereInput[] = [
+    { isDeleted: false },
+    { verificationStatus: TechinicianVerificationStatus.APPROVED },
+  ];
+
+  if (query.searchTerm) {
+    andConditions.push({
+      OR: [
+        { name: { contains: query.searchTerm, mode: "insensitive" } },
+        { specialization: { contains: query.searchTerm, mode: "insensitive" } },
+        { qualifications: { contains: query.searchTerm, mode: "insensitive" } },
+        { bio: { contains: query.searchTerm, mode: "insensitive" } },
+      ],
+    });
+  }
+
+  if (query.specialization) {
+    andConditions.push({
+      specialization: {
+        contains: String(query.specialization),
+        mode: "insensitive",
+      },
+    });
+  }
+
+  const minExperience = Number(query.minExperience);
+  if (!Number.isNaN(minExperience) && query.minExperience) {
+    andConditions.push({ experienceYears: { gte: minExperience } });
+  }
+
+  const maxFee = Number(query.maxFee);
+  if (!Number.isNaN(maxFee) && query.maxFee) {
+    andConditions.push({ consultationFee: { lte: maxFee } });
+  }
+
+  const where = { AND: andConditions };
+  const [data, total] = await Promise.all([
+    prisma.techinician.findMany({
+      where,
+      select: publicTechnicianSelect,
+      take: limit,
+      skip,
+      orderBy: { [sortBy]: sortOrder },
+    }),
+    prisma.techinician.count({ where }),
+  ]);
+
+  return {
+    data,
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+};
+
+const getPublicTechnician = async (techinicianId: string) => {
+  const technician = await prisma.techinician.findFirst({
+    where: {
+      id: techinicianId,
+      isDeleted: false,
+      verificationStatus: TechinicianVerificationStatus.APPROVED,
+    },
+    select: publicTechnicianSelect,
+  });
+
+  if (!technician) {
+    throw new AppError(httpStatus.NOT_FOUND, "Technician not found");
+  }
+
+  const related = await prisma.techinician.findMany({
+    where: {
+      isDeleted: false,
+      verificationStatus: TechinicianVerificationStatus.APPROVED,
+      specialization: {
+        equals: technician.specialization,
+        mode: "insensitive",
+      },
+      id: { not: technician.id },
+    },
+    select: publicTechnicianSelect,
+    take: 3,
+    orderBy: { experienceYears: "desc" },
+  });
+
+  return { technician, related };
+};
+
 export const TechinicianService = {
   applyAsTechinician,
- verifyTechinicianEmail,
+  verifyTechinicianEmail,
   approveTechinician,
-  getAllTechinician
+  getAllTechinician,
+  getPublicTechnicians,
+  getPublicTechnician,
 };

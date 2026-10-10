@@ -42,4 +42,7 @@ router.get(
 	TechinicianController.getAllTechinician,
 );
 
+router.get("/public", TechinicianController.getPublicTechnicians);
+router.get("/public/:techinicianId", TechinicianController.getPublicTechnician);
+
 export const TechinicianRoutes = router;

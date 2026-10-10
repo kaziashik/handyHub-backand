@@ -85,9 +85,34 @@ const getAllTechinician=catchAsync(async (req: Request, res: Response) => {
 	});
 });
 
+const getPublicTechnicians = catchAsync(async (req: Request, res: Response) => {
+  const { data, meta } = await TechinicianService.getPublicTechnicians(req.query);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Technicians retrieved successfully",
+    data,
+    meta,
+  });
+});
+
+const getPublicTechnician = catchAsync(async (req: Request, res: Response) => {
+  const result = await TechinicianService.getPublicTechnician(
+    String(req.params.techinicianId),
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Technician retrieved successfully",
+    data: result,
+  });
+});
+
 export const TechinicianController = {
   applyAsTechinician,
   verifyTechinicianEmail,
   approveTechinician,
-  getAllTechinician
+  getAllTechinician,
+  getPublicTechnicians,
+  getPublicTechnician,
 };

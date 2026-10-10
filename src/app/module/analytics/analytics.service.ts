@@ -238,8 +238,35 @@ const getTechicianAnalytics = async (user : RequestUser) => {
 
 }
 
+const getPublicOverview = async () => {
+  const [approvedTechnicians, customers, appointments, publishedSchedules] =
+    await Promise.all([
+      prisma.techinician.count({
+        where: {
+          isDeleted: false,
+          verificationStatus: TechinicianVerificationStatus.APPROVED,
+        },
+      }),
+      prisma.user.count({
+        where: { isDeleted: false, role: "CUSTOMER" },
+      }),
+      prisma.apppointment.count(),
+      prisma.schedule.count({
+        where: { isDeleted: false, status: ScheduleStatus.PUBLISHED },
+      }),
+    ]);
+
+  return {
+    approvedTechnicians,
+    customers,
+    appointments,
+    publishedSchedules,
+  };
+};
+
 export const AnalyticsServices = {
     getAdminAnalytics,
     getCustomerAnalytics,
-    getTechicianAnalytics
+    getTechicianAnalytics,
+    getPublicOverview,
 }

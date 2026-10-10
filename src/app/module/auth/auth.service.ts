@@ -227,13 +227,9 @@ const loginUser = async (payload: ILoginUserPayload) => {
     throw new Error("User is deleted");
   }
 
-  console.log("chek_auths_array", JSON.stringify(user.auths, null, 2));
   const credentialsAuth = user.auths.find(
     (auth) => auth.provider === "CREDENTIALS",
   );
-
-  console.log("chek_credentialsAuth",credentialsAuth);
-  console.log("chek_credentialsAuth",credentialsAuth?.password);
 
   if (!credentialsAuth || !credentialsAuth.password) {
     throw new Error(
