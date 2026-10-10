@@ -15,8 +15,30 @@ import type { StringValue } from "ms";
 import { AuthProvider, UserStatus } from "../../../generated/prisma/enums";
 import { TokenPayload } from "google-auth-library";
 import { googleClient } from "../../lib/googleAuth";
+import { UploadApiResponse } from "cloudinary";
+import { cloudinary } from "../../lib/cloudinary";
 
-const registerUser = async (payload: IRegisterUserPayload) => {
+async function uploadProfileBuffer(buffer: Buffer) {
+  return new Promise<UploadApiResponse>((resolve, reject) => {
+    cloudinary.uploader
+      .upload_stream(
+        { resource_type: "image", folder: "handyhub/profiles" },
+        (error, result) => {
+          if (error || !result) {
+            reject(error ?? new Error("Could not upload the photo"));
+            return;
+          }
+          resolve(result);
+        },
+      )
+      .end(buffer);
+  });
+}
+
+const registerUser = async (
+  payload: IRegisterUserPayload,
+  file?: Express.Multer.File,
+) => {
   const { name, password, role, phone } = payload;
   const email = payload.email.trim().toLowerCase();
 
@@ -24,6 +46,14 @@ const registerUser = async (payload: IRegisterUserPayload) => {
 
   if (isUserExists) {
     throw new Error("User with this email already exists");
+  }
+
+  let imageUrl = "";
+  let imagePublicId = "";
+  if (file) {
+    const uploaded = await uploadProfileBuffer(file.buffer);
+    imageUrl = uploaded.secure_url;
+    imagePublicId = uploaded.public_id;
   }
 
   const expirationSeconds = 5 * 60;
@@ -44,6 +74,8 @@ const registerUser = async (payload: IRegisterUserPayload) => {
     password: hashedPassword,
     role,
     phone,
+    imageUrl,
+    imagePublicId,
   };
 
   await redisClient.set(
@@ -132,6 +164,8 @@ const verifyUserEmail = async (payload: IVerifyEmailPayload) => {
       status: "ACTIVE",
       emailVerified: true,
       phone: userPayload.phone,
+      imageUrl: userPayload.imageUrl || "",
+      imagePublicId: userPayload.imagePublicId || "",
       auths: {
         create: {
           provider: "CREDENTIALS",

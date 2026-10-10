@@ -5,6 +5,7 @@ import { getBkashIdToken } from "../../lib/bkash";
 import { prisma } from "../../lib/prisma";
 import { RequestUser } from "../../middleware/checkAuth";
 import { AppError } from "../../utils/AppError";
+import { frontendPage } from "../../utils/frontend-url";
 import httpStatus from "http-status";
 import { transporter } from "../../lib/nodemailer";
 
@@ -405,7 +406,7 @@ const bookAppointmentCallback = async (query: Record<string, any>) => {
 		}
 
 		return {
-			redirectUrl: `${config.frontend_url}/dashboard/my-appointments?status=success`,
+			redirectUrl: frontendPage("/customer/appointments?status=success"),
 		};
 	} else if (status === "failure") {
 		await prisma.payment.update({
@@ -416,7 +417,7 @@ const bookAppointmentCallback = async (query: Record<string, any>) => {
 			},
 		});
 		return {
-			redirectUrl: `${config.frontend_url}/dashboard/my-appointments?status=failure`,
+			redirectUrl: frontendPage("/customer/appointments?status=failure"),
 		};
 	} else if (status === "cancel") {
 		await prisma.payment.update({
@@ -428,12 +429,12 @@ const bookAppointmentCallback = async (query: Record<string, any>) => {
 		});
 		return {
 			executedPaymentResult,
-			redirectUrl: `${config.frontend_url}/dashboard/my-appointments?status=cancel`,
+			redirectUrl: frontendPage("/customer/appointments?status=cancel"),
 		};
 	} else {
 		return {
 			executedPaymentResult,
-			redirectUrl: `${config.frontend_url}/dashboard/my-appointments?error=payment-failed`,
+			redirectUrl: frontendPage("/customer/appointments?error=payment-failed"),
 		};
 	}
 };

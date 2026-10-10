@@ -15,6 +15,7 @@ import { ContactRoutes } from "./app/module/contact/contact.route";
 import { globalErrorHandler } from "./app/middleware/globalErrorHandler";
 import { notFound } from "./app/middleware/notFound";
 import { generalLimiter } from "./app/middleware/rateLimiter";
+import { frontendOrigin } from "./app/utils/frontend-url";
 
 
 const app: Application = express();
@@ -22,7 +23,7 @@ app.set("trust proxy", 1);
 
 const allowedOrigins = (config.frontend_url ?? "")
   .split(",")
-  .map((origin) => origin.trim())
+  .map((origin) => frontendOrigin(origin))
   .filter(Boolean);
 
 app.use(

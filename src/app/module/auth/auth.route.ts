@@ -6,6 +6,7 @@ import { Role } from "../../../generated/prisma/enums";
 import { auth } from "../../middleware/checkAuth";
 import passport from "passport";
 import { authLimiter } from "../../middleware/rateLimiter";
+import { optionalProfilePhoto } from "../../lib/multer";
 
 
 const router = Router();
@@ -15,6 +16,7 @@ const router = Router();
 router.post(
   "/register",
   authLimiter,
+  optionalProfilePhoto,
   validateRequest(userValidation.RegisterUserZodSchema),
   AuthController.registerUse,
 );

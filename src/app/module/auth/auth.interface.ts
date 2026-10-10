@@ -12,6 +12,8 @@ export interface IRegisterUserPayload {
   password: string;
   role: Extract<Role, "CUSTOMER">;
   phone?: string;
+  imageUrl?: string;
+  imagePublicId?: string;
 }
 
 export interface IVerifyEmailPayload {

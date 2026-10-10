@@ -19,8 +19,7 @@ const registerUse = catchAsync(async (req: Request, res: Response) => {
   // }
 
   // console.log(payload);
-  const payload = req.body;
-  await AuthService.registerUser(payload);
+  await AuthService.registerUser(req.body, req.file);
 
   // const { accessToken, refreshToken, user, patient } = result;
 
